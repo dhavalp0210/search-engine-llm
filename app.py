@@ -1,52 +1,63 @@
 import streamlit as st
 import openai
 from langchain_openai import ChatOpenAI
-from langchain_community.utilities import ArxivAPIWrapper,WikipediaAPIWrapper
-from langchain_community.tools import ArxivQueryRun,WikipediaQueryRun,DuckDuckGoSearchRun
-from langchain.agents import initialize_agent,AgentType
-from langchain.callbacks import StreamlitCallbackHandler
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+import os
+
 import os
 from dotenv import load_dotenv
+load_dotenv()
 
-## Arxiv and wikipedia Tools
-arxiv_wrapper=ArxivAPIWrapper(top_k_results=1, doc_content_chars_max=200)
-arxiv=ArxivQueryRun(api_wrapper=arxiv_wrapper)
+## Langsmith Tracking
+os.environ["LANGCHAIN_API_KEY"]=os.getenv("LANGCHAIN_API_KEY")
+os.environ["LANGCHAIN_TRACING_V2"]="true"
+os.environ["LANGCHAIN_PROJECT"]="Simple Q&A Chatbot With OPENAI"
 
-api_wrapper=WikipediaAPIWrapper(top_k_results=1,doc_content_chars_max=200)
-wiki=WikipediaQueryRun(api_wrapper=api_wrapper)
+## Prompt Template
+prompt=ChatPromptTemplate.from_messages(
+    [
+        ("system","You are a helpful massistant . Please  repsonse to the user queries"),
+        ("user","Question:{question}")
+    ]
+)
 
-search=DuckDuckGoSearchRun(name="Search")
+def generate_response(question,api_key,engine,temperature,max_tokens):
+    openai.api_key=api_key
 
+    llm=ChatOpenAI(model=engine)
+    output_parser=StrOutputParser()
+    chain=prompt|llm|output_parser
+    answer=chain.invoke({'question':question})
+    return answer
 
-st.title("🔎 LangChain - Chat with search")
+## #Title of the app
+st.title("Enhanced Q&A Chatbot With OpenAI")
+
 
 
 ## Sidebar for settings
-# st.sidebar.title("Settings")
-# api_key=st.sidebar.text_input("Enter your openai API Key:",type="password")
+st.sidebar.title("Settings")
+api_key=st.sidebar.text_input("Enter your Open AI API Key:",type="password")
 
-if "messages" not in st.session_state:
-    st.session_state["messages"]=[
-        {"role":"assisstant","content":"Hi,I'm a chatbot who can search the web. How can I help you?"}
-    ]
+## Select the OpenAI model
+engine=st.sidebar.selectbox("Select Open AI model",["gpt-4o","gpt-4-turbo","gpt-4"])
 
-for msg in st.session_state.messages:
-    st.chat_message(msg["role"]).write(msg['content'])
+## Adjust response parameter
+temperature=st.sidebar.slider("Temperature",min_value=0.0,max_value=1.0,value=0.7)
+max_tokens = st.sidebar.slider("Max Tokens", min_value=50, max_value=300, value=150)
 
-if prompt:=st.chat_input(placeholder="What is machine learning?"):
-    st.session_state.messages.append({"role":"user","content":prompt})
-    st.chat_message("user").write(prompt)
+## MAin interface for user input
+st.write("Goe ahead and ask any question")
+user_input=st.text_input("You:")
 
-    
+if user_input and api_key:
+    response=generate_response(user_input,api_key,engine,temperature,max_tokens)
+    st.write(response)
 
-    llm = ChatOpenAI(model="gpt-4", openai_api_key="")
-    tools=[search,arxiv,wiki]
+elif user_input:
+    st.warning("Please enter the OPen AI aPi Key in the sider bar")
+else:
+    st.write("Please provide the user input")
 
-    search_agent=initialize_agent(tools,llm,agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,handling_parsing_errors=True)
-
-    with st.chat_message("assistant"):
-        st_cb=StreamlitCallbackHandler(st.container(),expand_new_thoughts=False)
-        response=search_agent.run(st.session_state.messages,callbacks=[st_cb])
-        st.session_state.messages.append({'role':'assistant',"content":response})
-        st.write(response)
 
