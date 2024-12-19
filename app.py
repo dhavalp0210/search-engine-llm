@@ -3,6 +3,7 @@ from langchain.prompts import PromptTemplate
 from langchain_groq import ChatGroq
 from langchain.chains.summarize import load_summarize_chain
 from langchain_community.document_loaders import YoutubeLoader,UnstructuredURLLoader
+from langchain_huggingface import HuggingFaceEndpoint
 
 
 ## sstreamlit APP
@@ -14,12 +15,14 @@ st.subheader('Summarize URL')
 
 ## Get the Groq API Key and url(YT or website)to be summarized
 with st.sidebar:
-    groq_api_key=st.text_input("Groq API Key",value="",type="password")
+    hf_api_key=st.text_input("Huggingface API Token",value="",type="password")
 
 generic_url=st.text_input("URL",label_visibility="collapsed")
 
 ## Gemma Model USsing Groq API
-llm =ChatGroq(model="Gemma-7b-It", groq_api_key=groq_api_key)
+##llm =ChatGroq(model="Gemma-7b-It", groq_api_key=groq_api_key)
+repo_id="mistralai/Mistral-7B-Instruct-v0.3"
+llm=HuggingFaceEndpoint(repo_id=repo_id,max_length=150,temperature=0.7,token=hf_api_key)
 
 prompt_template="""
 Provide a summary of the following content in 300 words:
@@ -30,7 +33,7 @@ prompt=PromptTemplate(template=prompt_template,input_variables=["text"])
 
 if st.button("Summarize the Content from YT or Website"):
     ## Validate all the inputs
-    if not groq_api_key.strip() or not generic_url.strip():
+    if not hf_api_key.strip() or not generic_url.strip():
         st.error("Please provide the information to get started")
     elif not validators.url(generic_url):
         st.error("Please enter a valid Url. It can may be a YT video utl or website url")
